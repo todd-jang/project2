@@ -1,0 +1,1416 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "name": "Project2.ipynb",
+      "provenance": [],
+      "collapsed_sections": [],
+      "mount_file_id": "1GMMR-GIFo921s65SnswKGopxDf019pFr",
+      "authorship_tag": "ABX9TyMGQq/HN83DFjQsdXvzRSIJ",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/todd-jang/project2/blob/main/AI_13_%EC%9E%A5%EA%B8%B0%ED%9B%88_section2-project\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# **BACKGROUND**"
+      ],
+      "metadata": {
+        "id": "LBnINh9LGHZh"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "When users are shopping online, not all will end up purchasing something. Most visitors to an online shopping website, in fact, likely don’t end up going through with a purchase during that web browsing session. It might be useful, though, for a shopping website to be able to predict whether a user intends to make a purchase or not: perhaps displaying different content to the user, like showing the user a discount offer if the website believes the user isn’t planning to complete the purchase. How could a website determine a user’s purchasing intent? That’s where machine learning will come in."
+      ],
+      "metadata": {
+        "id": "oKwFCpvd8wWg"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Your task in this problem is to build a nearest-neighbor classifier to solve this problem. Given information about a user — how many pages they’ve visited, whether they’re shopping on a weekend, what web browser they’re using, etc. — your classifier will predict whether or not the user will make a purchase. Your classifier won’t be perfectly accurate — perfectly modeling human behavior is a task well beyond the scope of this class — but it should be better than guessing randomly. To train your classifier, we’ll provide you with some data from a shopping website from about 12,000 users sessions."
+      ],
+      "metadata": {
+        "id": "L_dj7Ioi80sx"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "How do we measure the accuracy of a system like this? If we have a testing data set, we could run our classifier on the data, and compute what proportion of the time we correctly classify the user’s intent. This would give us a single accuracy percentage. But that number might be a little misleading. Imagine, for example, if about 15% of all users end up going through with a purchase. A classifier that always predicted that the user would not go through with a purchase, then, we would measure as being 85% accurate: the only users it classifies incorrectly are the 15% of users who do go through with a purchase. And while 85% accuracy sounds pretty good, that doesn’t seem like a very useful classifier.\n"
+      ],
+      "metadata": {
+        "id": "6zq0Af3A86Gj"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Instead, we’ll measure two values: sensitivity (also known as the “true positive rate”) and specificity (also known as the “true negative rate”). Sensitivity refers to the proportion of positive examples that were correctly identified: in other words, the proportion of users who did go through with a purchase who were correctly identified. Specificity refers to the proportion of negative examples that were correctly identified: in this case, the proportion of users who did not go through with a purchase who were correctly identified. So our “always guess no” classifier from before would have perfect specificity (1.0) but no sensitivity (0.0). Our goal is to build a classifier that performs reasonably on both metrics.\n",
+        "\n"
+      ],
+      "metadata": {
+        "id": "coE7sI4q9DFl"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# ***Intro***"
+      ],
+      "metadata": {
+        "id": "xJL-8TT59MY8"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Download the distribution code from https://cdn.cs50.net/ai/2020/x/projects/4/shopping.zip and unzip it.\n",
+        "\n",
+        "Run pip3 install scikit-learn to install the scikit-learn package if it isn’t already installed, which you’ll need for this project."
+      ],
+      "metadata": {
+        "id": "FeL0En139Wed"
+      }
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "9Vmwm2d2SA84",
+        "outputId": "cccd4ec9-badd-4d01-af57-eddab8571be8"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Drive already mounted at /content/drive; to attempt to forcibly remount, call drive.mount(\"/content/drive\", force_remount=True).\n"
+          ]
+        }
+      ],
+      "source": [
+        "from google.colab import drive\n",
+        "drive.mount('/content/drive')\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from pandas_profiling import ProfileReport"
+      ],
+      "metadata": {
+        "id": "C8nxpHu3TYp3"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pandas as pd\n",
+        "df=pd.read_csv('/content/drive/MyDrive/shopping.csv')\n",
+        "df"
+      ],
+      "metadata": {
+        "id": "1mzpImjOTvYa",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 488
+        },
+        "outputId": "6804853e-ae1b-458d-ec4d-628b785f6441"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "       Administrative  Administrative_Duration  Informational  \\\n",
+              "0                   0                      0.0              0   \n",
+              "1                   0                      0.0              0   \n",
+              "2                   0                      0.0              0   \n",
+              "3                   0                      0.0              0   \n",
+              "4                   0                      0.0              0   \n",
+              "...               ...                      ...            ...   \n",
+              "12325               3                    145.0              0   \n",
+              "12326               0                      0.0              0   \n",
+              "12327               0                      0.0              0   \n",
+              "12328               4                     75.0              0   \n",
+              "12329               0                      0.0              0   \n",
+              "\n",
+              "       Informational_Duration  ProductRelated  ProductRelated_Duration  \\\n",
+              "0                         0.0               1                 0.000000   \n",
+              "1                         0.0               2                64.000000   \n",
+              "2                         0.0               1                 0.000000   \n",
+              "3                         0.0               2                 2.666667   \n",
+              "4                         0.0              10               627.500000   \n",
+              "...                       ...             ...                      ...   \n",
+              "12325                     0.0              53              1783.791667   \n",
+              "12326                     0.0               5               465.750000   \n",
+              "12327                     0.0               6               184.250000   \n",
+              "12328                     0.0              15               346.000000   \n",
+              "12329                     0.0               3                21.250000   \n",
+              "\n",
+              "       BounceRates  ExitRates  PageValues  SpecialDay Month  OperatingSystems  \\\n",
+              "0         0.200000   0.200000    0.000000         0.0   Feb                 1   \n",
+              "1         0.000000   0.100000    0.000000         0.0   Feb                 2   \n",
+              "2         0.200000   0.200000    0.000000         0.0   Feb                 4   \n",
+              "3         0.050000   0.140000    0.000000         0.0   Feb                 3   \n",
+              "4         0.020000   0.050000    0.000000         0.0   Feb                 3   \n",
+              "...            ...        ...         ...         ...   ...               ...   \n",
+              "12325     0.007143   0.029031   12.241717         0.0   Dec                 4   \n",
+              "12326     0.000000   0.021333    0.000000         0.0   Nov                 3   \n",
+              "12327     0.083333   0.086667    0.000000         0.0   Nov                 3   \n",
+              "12328     0.000000   0.021053    0.000000         0.0   Nov                 2   \n",
+              "12329     0.000000   0.066667    0.000000         0.0   Nov                 3   \n",
+              "\n",
+              "       Browser  Region  TrafficType        VisitorType  Weekend  Revenue  \n",
+              "0            1       1            1  Returning_Visitor    False    False  \n",
+              "1            2       1            2  Returning_Visitor    False    False  \n",
+              "2            1       9            3  Returning_Visitor    False    False  \n",
+              "3            2       2            4  Returning_Visitor    False    False  \n",
+              "4            3       1            4  Returning_Visitor     True    False  \n",
+              "...        ...     ...          ...                ...      ...      ...  \n",
+              "12325        6       1            1  Returning_Visitor     True    False  \n",
+              "12326        2       1            8  Returning_Visitor     True    False  \n",
+              "12327        2       1           13  Returning_Visitor     True    False  \n",
+              "12328        2       3           11  Returning_Visitor    False    False  \n",
+              "12329        2       1            2        New_Visitor     True    False  \n",
+              "\n",
+              "[12330 rows x 18 columns]"
+            ],
+            "text/html": [
+              "\n",
+              "  <div id=\"df-a918d55f-b4af-4010-8f4d-1f87a4eb2f4c\">\n",
+              "    <div class=\"colab-df-container\">\n",
+              "      <div>\n",
+              "<style scoped>\n",
+              "    .dataframe tbody tr th:only-of-type {\n",
+              "        vertical-align: middle;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe tbody tr th {\n",
+              "        vertical-align: top;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe thead th {\n",
+              "        text-align: right;\n",
+              "    }\n",
+              "</style>\n",
+              "<table border=\"1\" class=\"dataframe\">\n",
+              "  <thead>\n",
+              "    <tr style=\"text-align: right;\">\n",
+              "      <th></th>\n",
+              "      <th>Administrative</th>\n",
+              "      <th>Administrative_Duration</th>\n",
+              "      <th>Informational</th>\n",
+              "      <th>Informational_Duration</th>\n",
+              "      <th>ProductRelated</th>\n",
+              "      <th>ProductRelated_Duration</th>\n",
+              "      <th>BounceRates</th>\n",
+              "      <th>ExitRates</th>\n",
+              "      <th>PageValues</th>\n",
+              "      <th>SpecialDay</th>\n",
+              "      <th>Month</th>\n",
+              "      <th>OperatingSystems</th>\n",
+              "      <th>Browser</th>\n",
+              "      <th>Region</th>\n",
+              "      <th>TrafficType</th>\n",
+              "      <th>VisitorType</th>\n",
+              "      <th>Weekend</th>\n",
+              "      <th>Revenue</th>\n",
+              "    </tr>\n",
+              "  </thead>\n",
+              "  <tbody>\n",
+              "    <tr>\n",
+              "      <th>0</th>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>1</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.200000</td>\n",
+              "      <td>0.200000</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>Feb</td>\n",
+              "      <td>1</td>\n",
+              "      <td>1</td>\n",
+              "      <td>1</td>\n",
+              "      <td>1</td>\n",
+              "      <td>Returning_Visitor</td>\n",
+              "      <td>False</td>\n",
+              "      <td>False</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>1</th>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>2</td>\n",
+              "      <td>64.000000</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.100000</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>Feb</td>\n",
+              "      <td>2</td>\n",
+              "      <td>2</td>\n",
+              "      <td>1</td>\n",
+              "      <td>2</td>\n",
+              "      <td>Returning_Visitor</td>\n",
+              "      <td>False</td>\n",
+              "      <td>False</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>2</th>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>1</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.200000</td>\n",
+              "      <td>0.200000</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>Feb</td>\n",
+              "      <td>4</td>\n",
+              "      <td>1</td>\n",
+              "      <td>9</td>\n",
+              "      <td>3</td>\n",
+              "      <td>Returning_Visitor</td>\n",
+              "      <td>False</td>\n",
+              "      <td>False</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>3</th>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>2</td>\n",
+              "      <td>2.666667</td>\n",
+              "      <td>0.050000</td>\n",
+              "      <td>0.140000</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>Feb</td>\n",
+              "      <td>3</td>\n",
+              "      <td>2</td>\n",
+              "      <td>2</td>\n",
+              "      <td>4</td>\n",
+              "      <td>Returning_Visitor</td>\n",
+              "      <td>False</td>\n",
+              "      <td>False</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>4</th>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>10</td>\n",
+              "      <td>627.500000</td>\n",
+              "      <td>0.020000</td>\n",
+              "      <td>0.050000</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>Feb</td>\n",
+              "      <td>3</td>\n",
+              "      <td>3</td>\n",
+              "      <td>1</td>\n",
+              "      <td>4</td>\n",
+              "      <td>Returning_Visitor</td>\n",
+              "      <td>True</td>\n",
+              "      <td>False</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>...</th>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "      <td>...</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>12325</th>\n",
+              "      <td>3</td>\n",
+              "      <td>145.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>53</td>\n",
+              "      <td>1783.791667</td>\n",
+              "      <td>0.007143</td>\n",
+              "      <td>0.029031</td>\n",
+              "      <td>12.241717</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>Dec</td>\n",
+              "      <td>4</td>\n",
+              "      <td>6</td>\n",
+              "      <td>1</td>\n",
+              "      <td>1</td>\n",
+              "      <td>Returning_Visitor</td>\n",
+              "      <td>True</td>\n",
+              "      <td>False</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>12326</th>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>5</td>\n",
+              "      <td>465.750000</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.021333</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>Nov</td>\n",
+              "      <td>3</td>\n",
+              "      <td>2</td>\n",
+              "      <td>1</td>\n",
+              "      <td>8</td>\n",
+              "      <td>Returning_Visitor</td>\n",
+              "      <td>True</td>\n",
+              "      <td>False</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>12327</th>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>6</td>\n",
+              "      <td>184.250000</td>\n",
+              "      <td>0.083333</td>\n",
+              "      <td>0.086667</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>Nov</td>\n",
+              "      <td>3</td>\n",
+              "      <td>2</td>\n",
+              "      <td>1</td>\n",
+              "      <td>13</td>\n",
+              "      <td>Returning_Visitor</td>\n",
+              "      <td>True</td>\n",
+              "      <td>False</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>12328</th>\n",
+              "      <td>4</td>\n",
+              "      <td>75.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>15</td>\n",
+              "      <td>346.000000</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.021053</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>Nov</td>\n",
+              "      <td>2</td>\n",
+              "      <td>2</td>\n",
+              "      <td>3</td>\n",
+              "      <td>11</td>\n",
+              "      <td>Returning_Visitor</td>\n",
+              "      <td>False</td>\n",
+              "      <td>False</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>12329</th>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>3</td>\n",
+              "      <td>21.250000</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.066667</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>Nov</td>\n",
+              "      <td>3</td>\n",
+              "      <td>2</td>\n",
+              "      <td>1</td>\n",
+              "      <td>2</td>\n",
+              "      <td>New_Visitor</td>\n",
+              "      <td>True</td>\n",
+              "      <td>False</td>\n",
+              "    </tr>\n",
+              "  </tbody>\n",
+              "</table>\n",
+              "<p>12330 rows × 18 columns</p>\n",
+              "</div>\n",
+              "      <button class=\"colab-df-convert\" onclick=\"convertToInteractive('df-a918d55f-b4af-4010-8f4d-1f87a4eb2f4c')\"\n",
+              "              title=\"Convert this dataframe to an interactive table.\"\n",
+              "              style=\"display:none;\">\n",
+              "        \n",
+              "  <svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\"viewBox=\"0 0 24 24\"\n",
+              "       width=\"24px\">\n",
+              "    <path d=\"M0 0h24v24H0V0z\" fill=\"none\"/>\n",
+              "    <path d=\"M18.56 5.44l.94 2.06.94-2.06 2.06-.94-2.06-.94-.94-2.06-.94 2.06-2.06.94zm-11 1L8.5 8.5l.94-2.06 2.06-.94-2.06-.94L8.5 2.5l-.94 2.06-2.06.94zm10 10l.94 2.06.94-2.06 2.06-.94-2.06-.94-.94-2.06-.94 2.06-2.06.94z\"/><path d=\"M17.41 7.96l-1.37-1.37c-.4-.4-.92-.59-1.43-.59-.52 0-1.04.2-1.43.59L10.3 9.45l-7.72 7.72c-.78.78-.78 2.05 0 2.83L4 21.41c.39.39.9.59 1.41.59.51 0 1.02-.2 1.41-.59l7.78-7.78 2.81-2.81c.8-.78.8-2.07 0-2.86zM5.41 20L4 18.59l7.72-7.72 1.47 1.35L5.41 20z\"/>\n",
+              "  </svg>\n",
+              "      </button>\n",
+              "      \n",
+              "  <style>\n",
+              "    .colab-df-container {\n",
+              "      display:flex;\n",
+              "      flex-wrap:wrap;\n",
+              "      gap: 12px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert {\n",
+              "      background-color: #E8F0FE;\n",
+              "      border: none;\n",
+              "      border-radius: 50%;\n",
+              "      cursor: pointer;\n",
+              "      display: none;\n",
+              "      fill: #1967D2;\n",
+              "      height: 32px;\n",
+              "      padding: 0 0 0 0;\n",
+              "      width: 32px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert:hover {\n",
+              "      background-color: #E2EBFA;\n",
+              "      box-shadow: 0px 1px 2px rgba(60, 64, 67, 0.3), 0px 1px 3px 1px rgba(60, 64, 67, 0.15);\n",
+              "      fill: #174EA6;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert {\n",
+              "      background-color: #3B4455;\n",
+              "      fill: #D2E3FC;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert:hover {\n",
+              "      background-color: #434B5C;\n",
+              "      box-shadow: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);\n",
+              "      filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.3));\n",
+              "      fill: #FFFFFF;\n",
+              "    }\n",
+              "  </style>\n",
+              "\n",
+              "      <script>\n",
+              "        const buttonEl =\n",
+              "          document.querySelector('#df-a918d55f-b4af-4010-8f4d-1f87a4eb2f4c button.colab-df-convert');\n",
+              "        buttonEl.style.display =\n",
+              "          google.colab.kernel.accessAllowed ? 'block' : 'none';\n",
+              "\n",
+              "        async function convertToInteractive(key) {\n",
+              "          const element = document.querySelector('#df-a918d55f-b4af-4010-8f4d-1f87a4eb2f4c');\n",
+              "          const dataTable =\n",
+              "            await google.colab.kernel.invokeFunction('convertToInteractive',\n",
+              "                                                     [key], {});\n",
+              "          if (!dataTable) return;\n",
+              "\n",
+              "          const docLinkHtml = 'Like what you see? Visit the ' +\n",
+              "            '<a target=\"_blank\" href=https://colab.research.google.com/notebooks/data_table.ipynb>data table notebook</a>'\n",
+              "            + ' to learn more about interactive tables.';\n",
+              "          element.innerHTML = '';\n",
+              "          dataTable['output_type'] = 'display_data';\n",
+              "          await google.colab.output.renderOutput(dataTable, element);\n",
+              "          const docLink = document.createElement('div');\n",
+              "          docLink.innerHTML = docLinkHtml;\n",
+              "          element.appendChild(docLink);\n",
+              "        }\n",
+              "      </script>\n",
+              "    </div>\n",
+              "  </div>\n",
+              "  "
+            ]
+          },
+          "metadata": {},
+          "execution_count": 28
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "df.shape # Data Frame Dim. Size확인"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "PgGf6oetZKkm",
+        "outputId": "2eb71e76-9ef4-4009-fee4-29b7332cf610"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "(12330, 18)"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 29
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "df.describe(), df.describe # descritive statistics 확인 및 nan 또는 outlier확인"
+      ],
+      "metadata": {
+        "id": "e4K5XknSZWlb",
+        "outputId": "e67e0b12-fada-4992-c6cd-38cbe2f4a75b",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "(       Administrative  Administrative_Duration  Informational  \\\n",
+              " count    12330.000000             12330.000000   12330.000000   \n",
+              " mean         2.315166                80.818611       0.503569   \n",
+              " std          3.321784               176.779107       1.270156   \n",
+              " min          0.000000                 0.000000       0.000000   \n",
+              " 25%          0.000000                 0.000000       0.000000   \n",
+              " 50%          1.000000                 7.500000       0.000000   \n",
+              " 75%          4.000000                93.256250       0.000000   \n",
+              " max         27.000000              3398.750000      24.000000   \n",
+              " \n",
+              "        Informational_Duration  ProductRelated  ProductRelated_Duration  \\\n",
+              " count            12330.000000    12330.000000             12330.000000   \n",
+              " mean                34.472398       31.731468              1194.746220   \n",
+              " std                140.749294       44.475503              1913.669288   \n",
+              " min                  0.000000        0.000000                 0.000000   \n",
+              " 25%                  0.000000        7.000000               184.137500   \n",
+              " 50%                  0.000000       18.000000               598.936905   \n",
+              " 75%                  0.000000       38.000000              1464.157214   \n",
+              " max               2549.375000      705.000000             63973.522230   \n",
+              " \n",
+              "         BounceRates     ExitRates    PageValues    SpecialDay  \\\n",
+              " count  12330.000000  12330.000000  12330.000000  12330.000000   \n",
+              " mean       0.022191      0.043073      5.889258      0.061427   \n",
+              " std        0.048488      0.048597     18.568437      0.198917   \n",
+              " min        0.000000      0.000000      0.000000      0.000000   \n",
+              " 25%        0.000000      0.014286      0.000000      0.000000   \n",
+              " 50%        0.003112      0.025156      0.000000      0.000000   \n",
+              " 75%        0.016813      0.050000      0.000000      0.000000   \n",
+              " max        0.200000      0.200000    361.763742      1.000000   \n",
+              " \n",
+              "        OperatingSystems       Browser        Region   TrafficType  \n",
+              " count      12330.000000  12330.000000  12330.000000  12330.000000  \n",
+              " mean           2.124006      2.357097      3.147364      4.069586  \n",
+              " std            0.911325      1.717277      2.401591      4.025169  \n",
+              " min            1.000000      1.000000      1.000000      1.000000  \n",
+              " 25%            2.000000      2.000000      1.000000      2.000000  \n",
+              " 50%            2.000000      2.000000      3.000000      2.000000  \n",
+              " 75%            3.000000      2.000000      4.000000      4.000000  \n",
+              " max            8.000000     13.000000      9.000000     20.000000  ,\n",
+              " <bound method NDFrame.describe of        Administrative  Administrative_Duration  Informational  \\\n",
+              " 0                   0                      0.0              0   \n",
+              " 1                   0                      0.0              0   \n",
+              " 2                   0                      0.0              0   \n",
+              " 3                   0                      0.0              0   \n",
+              " 4                   0                      0.0              0   \n",
+              " ...               ...                      ...            ...   \n",
+              " 12325               3                    145.0              0   \n",
+              " 12326               0                      0.0              0   \n",
+              " 12327               0                      0.0              0   \n",
+              " 12328               4                     75.0              0   \n",
+              " 12329               0                      0.0              0   \n",
+              " \n",
+              "        Informational_Duration  ProductRelated  ProductRelated_Duration  \\\n",
+              " 0                         0.0               1                 0.000000   \n",
+              " 1                         0.0               2                64.000000   \n",
+              " 2                         0.0               1                 0.000000   \n",
+              " 3                         0.0               2                 2.666667   \n",
+              " 4                         0.0              10               627.500000   \n",
+              " ...                       ...             ...                      ...   \n",
+              " 12325                     0.0              53              1783.791667   \n",
+              " 12326                     0.0               5               465.750000   \n",
+              " 12327                     0.0               6               184.250000   \n",
+              " 12328                     0.0              15               346.000000   \n",
+              " 12329                     0.0               3                21.250000   \n",
+              " \n",
+              "        BounceRates  ExitRates  PageValues  SpecialDay Month  OperatingSystems  \\\n",
+              " 0         0.200000   0.200000    0.000000         0.0   Feb                 1   \n",
+              " 1         0.000000   0.100000    0.000000         0.0   Feb                 2   \n",
+              " 2         0.200000   0.200000    0.000000         0.0   Feb                 4   \n",
+              " 3         0.050000   0.140000    0.000000         0.0   Feb                 3   \n",
+              " 4         0.020000   0.050000    0.000000         0.0   Feb                 3   \n",
+              " ...            ...        ...         ...         ...   ...               ...   \n",
+              " 12325     0.007143   0.029031   12.241717         0.0   Dec                 4   \n",
+              " 12326     0.000000   0.021333    0.000000         0.0   Nov                 3   \n",
+              " 12327     0.083333   0.086667    0.000000         0.0   Nov                 3   \n",
+              " 12328     0.000000   0.021053    0.000000         0.0   Nov                 2   \n",
+              " 12329     0.000000   0.066667    0.000000         0.0   Nov                 3   \n",
+              " \n",
+              "        Browser  Region  TrafficType        VisitorType  Weekend  Revenue  \n",
+              " 0            1       1            1  Returning_Visitor    False    False  \n",
+              " 1            2       1            2  Returning_Visitor    False    False  \n",
+              " 2            1       9            3  Returning_Visitor    False    False  \n",
+              " 3            2       2            4  Returning_Visitor    False    False  \n",
+              " 4            3       1            4  Returning_Visitor     True    False  \n",
+              " ...        ...     ...          ...                ...      ...      ...  \n",
+              " 12325        6       1            1  Returning_Visitor     True    False  \n",
+              " 12326        2       1            8  Returning_Visitor     True    False  \n",
+              " 12327        2       1           13  Returning_Visitor     True    False  \n",
+              " 12328        2       3           11  Returning_Visitor    False    False  \n",
+              " 12329        2       1            2        New_Visitor     True    False  \n",
+              " \n",
+              " [12330 rows x 18 columns]>)"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 30
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "First, open up shopping.csv, the data set provided to you for this project. You can open it in a text editor, but you may find it easier to understand visually in a spreadsheet application like Microsoft Excel, Apple Numbers, or Google Sheets."
+      ],
+      "metadata": {
+        "id": "BccPzb1s97ce"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# **Legend**"
+      ],
+      "metadata": {
+        "id": "pVs8LNoS-Pwd"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "The first six columns measure the different types of pages users have visited in the session: the Administrative, Informational, and ProductRelated columns measure how many of those types of pages the user visited, and their corresponding _Duration columns measure how much time the user spent on any of those pages. The BounceRates, ExitRates, and PageValues columns measure information from Google Analytics about the page the user visited. SpecialDay is a value that measures how close the date of the user’s session is to a special day (like Valentine’s Day or Mother’s Day). Month is an abbreviation of the month the user visited. OperatingSystems, Browser, Region, and TrafficType are all integers describing information about the user themself. VisitorType will take on the value Returning_Visitor for returning visitors and some other string value for non-returning visitors. Weekend is TRUE or FALSE depending on whether or not the user is visiting on a weekend.\n"
+      ],
+      "metadata": {
+        "id": "7KdRmcQn-XsH"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Perhaps the most important column, though, is the last one: the Revenue column. This is the column that indicates whether the user ultimately made a purchase or not: TRUE if they did, FALSE if they didn’t. This is the column that we’d like to learn to predict (the “label”), based on the values for all of the other columns (the “evidence”).\n"
+      ],
+      "metadata": {
+        "id": "NyioOvjX-kcn"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Instead, we’ll measure two values: sensitivity (also known as the “true positive rate”) and specificity (also known as the “true negative rate”). Sensitivity refers to the proportion of positive examples that were correctly identified: in other words, the proportion of users who did go through with a purchase who were correctly identified. Specificity refers to the proportion of negative examples that were correctly identified: in this case, the proportion of users who did not go through with a purchase who were correctly identified. So our “always guess no” classifier from before would have perfect specificity (1.0) but no sensitivity (0.0). Our goal is to build a classifier that performs reasonably on both metrics."
+      ],
+      "metadata": {
+        "id": "P3Ya3pNnAWXm"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "\n",
+        "\n",
+        "---\n",
+        "\n"
+      ],
+      "metadata": {
+        "id": "DIIMT0QZF4i2"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# ***Specification***\n",
+        "An automated tool assists the staff in enforcing the constraints in the below specification. Your submission will fail if any of these are not handled properly, if you import modules other than those explicitly allowed, or if you modify functions other than as permitted."
+      ],
+      "metadata": {
+        "id": "HMFNdve2CBDD"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "\n",
+        "\n",
+        "---\n",
+        "\n",
+        "\n",
+        "\n"
+      ],
+      "metadata": {
+        "id": "aiNi0qXOB6_k"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Complete the implementation of load_data, train_model, and evaluate in shopping.py.\n",
+        "\n",
+        "The load_data function should accept a CSV filename as its argument, open that file, and return a tuple (evidence, labels). evidence should be a list of all of the evidence for each of the data points, and labels should be a list of all of the labels for each data point."
+      ],
+      "metadata": {
+        "id": "aXxHJrQ0CT_I"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Since you’ll have one piece of evidence and one label for each row of the spreadsheet, the length of the evidence list and the length of the labels list should ultimately be equal to the number of rows in the CSV spreadsheet (excluding the header row). The lists should be ordered according to the order the users appear in the spreadsheet. That is to say, evidence[0] should be the evidence for the first user, and labels[0] should be the label for the first user.\n",
+        "Each element in the evidence list should itself be a list. The list should be of length 17: the number of columns in the spreadsheet excluding the final column (the label column).\n",
+        "The values in each evidence list should be in the same order as the columns that appear in the evidence spreadsheet. You may assume that the order of columns in shopping.csv will always be presented in that order.\n",
+        "Note that, to build a nearest-neighbor classifier, all of our data needs to be numeric. Be sure that your values have the following types:"
+      ],
+      "metadata": {
+        "id": "yuZik1jeCxjr"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "df.dtypes #데이타 타입 확인"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "krByErBqm6rw",
+        "outputId": "0a1ed263-0e84-4afd-e734-aead33d744d3"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "Administrative               int64\n",
+              "Administrative_Duration    float64\n",
+              "Informational                int64\n",
+              "Informational_Duration     float64\n",
+              "ProductRelated               int64\n",
+              "ProductRelated_Duration    float64\n",
+              "BounceRates                float64\n",
+              "ExitRates                  float64\n",
+              "PageValues                 float64\n",
+              "SpecialDay                 float64\n",
+              "Month                       object\n",
+              "OperatingSystems             int64\n",
+              "Browser                      int64\n",
+              "Region                       int64\n",
+              "TrafficType                  int64\n",
+              "VisitorType                 object\n",
+              "Weekend                       bool\n",
+              "Revenue                       bool\n",
+              "dtype: object"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 31
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "\n",
+        "\n",
+        "> 들여쓴 블록\n",
+        "Administrative, Informational, ProductRelated, Month, OperatingSystems, Browser, Region, TrafficType, VisitorType, and Weekend should all be of type int\n",
+        "\n",
+        "> 들여쓴 블록 Administrative_Duration, Informational_Duration, ProductRelated_Duration, BounceRates, ExitRates, PageValues, and SpecialDay should all be of type float.\n",
+        "\n",
+        "> 들여쓴 블록 Month should be 0 for January, 1 for February, 2 for March, etc. up to 11 for December.\n",
+        "\n",
+        "\n",
+        "> 들여쓴 블록 VisitorType should be 1 for returning visitors and 0 for non-returning visitors.\n",
+        "\n",
+        "> 들여쓴 블록 Weekend should be 1 if the user visited on a weekend and 0 otherwise.\n",
+        "\n"
+      ],
+      "metadata": {
+        "id": "hWwS-W9qCzLN"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "#테이타 type 변경\n",
+        "train_csv=df\n",
+        "train_csv['Weekend'] = train_csv['Weekend'].astype('category')\n",
+        "train_csv['VisitorType'] = train_csv['VisitorType'].astype('category')\n",
+        "train_csv['Administrative']=train_csv['Administrative'].astype('int') \n",
+        "train_csv['Informational']=train_csv['Informational'].astype('int')\n",
+        "train_csv['ProductRelated']=train_csv['ProductRelated'].astype('int')\n",
+        "train_csv['OperatingSystems']=train_csv['OperatingSystems'].astype('int')\n",
+        "train_csv['SpecialDay']=train_csv['SpecialDay'].astype('float') \n",
+        "\n",
+        "\n",
+        "#Month feature 숫자로 지정\n",
+        "\"\"\"Month should be 0 for January, 1 for February, 2 for March, etc. up to 11 for December\"\"\"\n",
+        "#VisitorType,Revenue 를 0또는 1로 지정\n",
+        "\"\"\"VisitorType 1 for returning visitors  0 for non-returning visitor\"\"\"\n",
+        "#변수 선언\n",
+        "\n",
+        "\n",
+        "rev_dataset = pd.DataFrame()\n",
+        "df = pd.DataFrame(data=features, columns=rev_dataset.feature_names)\n",
+        "df['target'] = target\n",
+        "\n",
+        "X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=2)\n",
+        "print(X_train.shape, X_test.shape)\n",
+        "\n",
+        "X_train = pd.DataFrame(X_train, columns = rev_dataset.feature_names)\n",
+        "X_test = pd.DataFrame(X_test, columns = rev_dataset.feature_names)\n",
+        "    "
+      ],
+      "metadata": {
+        "id": "0xNgz9S0nNN6"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Each value of labels should either be the integer 1, if the user did go through with a purchase, or 0 otherwise.\n",
+        "For example, the value of the first evidence list should be [0, 0.0, 0, 0.0, 1, 0.0, 0.2, 0.2, 0.0, 0.0, 1, 1, 1, 1, 1, 1, 0] and the value of the first label should be 0."
+      ],
+      "metadata": {
+        "id": "qR3C0a7eDpPP"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "\"\"\"# 불필요한 라벨 드랍\n",
+        "train_csv.drop(columns='Weekend', inplace=True)\"\"\""
+      ],
+      "metadata": {
+        "id": "GHdF3P1bS189"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "train_csv.columns"
+      ],
+      "metadata": {
+        "id": "7dXu2D1HS4KS"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "\"\"\"# 정규화가 불필요한 Columns Drop\n",
+        "train_csv.drop(columns=['Month','Weekend','VisitorType','SpecialDay' inplace=True]\"\"\""
+      ],
+      "metadata": {
+        "id": "ElhVm4KDS60F"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "\"\"\"# save the preprocessed data\n",
+        "train.to_csv('./content/drive/MyDrive/shopping_preprocessed.csv')\"\"\""
+      ],
+      "metadata": {
+        "id": "yO823aiCDBrG"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Pandas Profiling 불러오기\n",
+        "from pandas_profiling import ProfileReport\n"
+      ],
+      "metadata": {
+        "id": "s0bIj5AqTOYi"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "profile = ProfileReport(train_csv, minimal=True)\n",
+        "profile"
+      ],
+      "metadata": {
+        "id": "OB8_2HNsA5P9"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pandas as pd\n",
+        "\n",
+        "df_data = pd.DataFrame(rev_dataset.data)\n",
+        "df_labels = pd.DataFrame(rev_dataset.target)"
+      ],
+      "metadata": {
+        "id": "YphbltRsT4OU"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "df_labels.head()"
+      ],
+      "metadata": {
+        "id": "ekLVXHpjYwP4"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "#데이타 정규화 필요에 의해 Normalization ? 필요한가!\n",
+        "\"\"\"def min_max_normalize(lst):\n",
+        "\n",
+        "    normalized = []\n",
+        "    \n",
+        "    for value in lst:\n",
+        "        normalized_num = (value - min(lst)) / (max(lst) - min(lst))\n",
+        "        normalized.append(normalized_num)\n",
+        "    \n",
+        "    return normalized\"\"\""
+      ],
+      "metadata": {
+        "id": "x8sUdeKeTXTD"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "\"\"\"for x in range(len(df_data.columns)):\n",
+        "    df_data[x] = min_max_normalize(df_data[x])\n",
+        "\n",
+        "df_data.describe()\"\"\""
+      ],
+      "metadata": {
+        "id": "67cGonClTs2r"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "#변수\n",
+        "def evaluate(labels, predictions): \n",
+        "     tp = 0\n",
+        "     fn = 0\n",
+        "     fp = 0\n",
+        "     tn = 0\n",
+        "     for actual, prediction in zip(labels, predictions):\n",
+        "        if actual == prediction:\n",
+        "            if actual == 1:\n",
+        "                tp += 1\n",
+        "            else:\n",
+        "                tn += 1\n",
+        "        else:\n",
+        "            if actual == 1:\n",
+        "                if prediction == 0:\n",
+        "                    fp += 1\n",
+        "                else:\n",
+        "                    fn += 1\n",
+        "     return tp / (tp + fn), tn / (tn + fp)"
+      ],
+      "metadata": {
+        "id": "iPZlDnd0WZdm"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from sklearn.neighbors import KNeighborsClassifier #모든 데이타가 수치데이타이므로 KNeighborsClassifier를 사용하여 보기로함 (k=1)\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.metrics import accuracy_score\n",
+        "import matplotlib.pydot as plt\n",
+        "\"\"\"# 훈련 / 검증 분리\n",
+        "target = 'Revenue'\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "\n",
+        "training_data, validation_data , training_labels, validation_labels = train_test_split(df_data, df_labels, test_size = 0.2, random_state = 100)\n",
+        "train, val = train_test_split(train_csv, train_size=0.80, test_size=0.20, \n",
+        "                              stratify=train_csv[target], random_state=2)\n",
+        "\n",
+        "train.shape, val.shape, test.shape\n",
+        "\n",
+        "print(len(training_data)) # train test split된 데이타의 size(갯수)\n",
+        "print(len(validation_data))\n",
+        "print(len(training_labels))\n",
+        "print(len(validation_labels))\"\"\"\n",
+        "\n",
+        "\"\"\"# 타겟 비율 확인 -> 0 범주 비율이 높다 (기준 모델로 지정)\n",
+        "train[target].value_counts(normalize=True)\n",
+        "\n",
+        "# 특성 분리?\n",
+        "features = train.drop(columns=[target]).columns\"\"\"\n",
+        "\n",
+        "#모델 Building: k값을 1~7까지 해봄\n",
+        "\n",
+        "classifier=KNeighborsClassifier(n_neighbors=3) \n",
+        "\n",
+        "\n",
+        "labels='Revenue'\n",
+        "X_train,X_test,y_train,y_test = train_test_split(labels.load_data,labels.target, test_size=0.3,stratified=labels.target,random_states=100)\n",
+        "\n",
+        "training_accuracy=[]\n",
+        "test_accuracy=[]\n",
+        "neighbors_settings=range(1.101)\n",
+        "for n_neighbors in neighbors_settings:\n",
+        "    clf=KNeighborsClassifier(n_neighbors=n_neighbors)\n",
+        "    clf.fit(X_train,y_train)\n",
+        "    training_accuracy.append(classifier.score(X_train,y_train))\n",
+        "    test_accuracy.append(classifier.score(X_test,y_test))\n",
+        "\n",
+        "classifier.fit(training_data,target_labels) # 데이타를 KNeighbors Classifier ML모델에 학습\n"
+      ],
+      "metadata": {
+        "id": "YENKlAx0pIXq"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "\"\"\"print(classifier.score(validation_data,validation_labels)) #검증세트의 테스트 정확도 평가\"\"\""
+      ],
+      "metadata": {
+        "id": "LJeFEL1FQtH1"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "ML Model 평가"
+      ],
+      "metadata": {
+        "id": "SgxNmys3m4eW"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "#결과 시각화\n",
+        "plt.plot(neighbors_settings,training_accuracy,label='train_accuracy')\n",
+        "plt.plot(neighbors_settings,test_accuracy,label='test_accuracy')\n",
+        "plt.ylabel('accuracy')\n",
+        "plt.xlabel('n_neighbors')\n",
+        "plt.legend()\n",
+        "plt.show()\n",
+        "\n"
+      ],
+      "metadata": {
+        "id": "kU56KuafILub"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# 결과 시각화\n",
+        "import matplotlib.pyplot as plt\n",
+        "k_list = range(1,101)\n",
+        "accuracies = []\n",
+        "for k in k_list:\n",
+        "  classifier = KNeighborsClassifier(n_neighbors = k)\n",
+        "  classifier.fit(training_data, training_labels)\n",
+        "  accuracies.append(classifier.score(validation_data, validation_labels))\n",
+        "\n",
+        "plt.plot(k_list, accuracies)\n",
+        "plt.xlabel(\"k\")\n",
+        "plt.ylabel(\"Validation Accuracy\")\n",
+        "plt.title(\"Shopping Classifier Accuracy\")\n",
+        "plt.show()"
+      ],
+      "metadata": {
+        "id": "Y848iExSQiDJ"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "k가 커질수록 정확도가 낮아진것 확인 k가 1 일때 best"
+      ],
+      "metadata": {
+        "id": "vHTuHoullzbc"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# True Positive 즉 Sensitivity와 True Negative 즉 Specificity를 구하는 EVALUATE 함수를 통하여 (sensitivity, specificity)를  구한다.\n",
+        "\n",
+        "\n",
+        "def evaluate(labels, predictions):\n",
+        "    \"\"\"\n",
+        "    Given a list of actual labels and a list of predicted labels,\n",
+        "    return a tuple (sensitivity, specificty).\n",
+        "    Assume each label is either a 1 (positive) or 0 (negative).\n",
+        "    `sensitivity` should be a floating-point value from 0 to 1\n",
+        "    representing the \"true positive rate\": the proportion of\n",
+        "    actual positive labels that were accurately identified.\n",
+        "    `specificity` should be a floating-point value from 0 to 1\n",
+        "    representing the \"true negative rate\": the proportion of\n",
+        "    actual negative labels that were accurately identified.\n",
+        "    \"\"\"\n",
+        "    sensitivity = float(0)\n",
+        "    specificity = float(0)\n",
+        "\n",
+        "    total_positive = float(0)\n",
+        "    total_negative = float(0)\n",
+        "\n",
+        "    for label, prediction in zip(labels, predictions):\n",
+        "\n",
+        "        if label == 1:\n",
+        "            total_positive += 1\n",
+        "            if label == prediction:\n",
+        "                sensitivity += 1\n",
+        "\n",
+        "        if label == 0:\n",
+        "            total_negative += 1\n",
+        "            if label == prediction:\n",
+        "                specificity += 1\n",
+        "\n",
+        "    sensitivity /= total_positive\n",
+        "    specificity /= total_negative\n",
+        "\n",
+        "    return sensitivity, specificity\n",
+        "\n",
+        "\"\"\"print(classification_report(y_val, y_pred))\"\"\""
+      ],
+      "metadata": {
+        "id": "RWvIMIJvwxYx"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "\n",
+        "\n",
+        "---\n",
+        "\n"
+      ],
+      "metadata": {
+        "id": "uq-whaOUDvJD"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "The train_model function should accept a list of evidence and a list of labels, and return a scikit-learn nearest-neighbor classifier (a k-nearest-neighbor classifier where k = 1) fitted on that training data.\n",
+        "\n",
+        "Notice that we’ve already imported for you from sklearn.neighbors import KNeighborsClassifier. You’ll want to use a KNeighborsClassifier in this function."
+      ],
+      "metadata": {
+        "id": "hNHfDoYDDwQ7"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "\n",
+        "\n",
+        "---\n",
+        "\n"
+      ],
+      "metadata": {
+        "id": "gDVrh6geDyxi"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "The evaluate function should accept a list of labels (the true labels for the users in the testing set) and a list of predictions (the labels predicted by your classifier), and return two floating-point values (sensitivity, specificity).\n",
+        "\n",
+        "sensitivity should be a floating-point value from 0 to 1 representing the “true positive rate”: the proportion of actual positive labels that were accurately identified.\n",
+        "specificity should be a floating-point value from 0 to 1 representing the “true negative rate”: the proportion of actual negative labels that were accurately identified.\n",
+        "You may assume each label will be 1 for positive results (users who did go through with a purchase) or 0 for negative results (users who did not go through with a purchase).\n",
+        "You may assume that the list of true labels will contain at least one positive label and at least one negative label."
+      ],
+      "metadata": {
+        "id": "F0z0nQbfD2Sf"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "You should not modify anything else in shopping.py other than the functions the specification calls for you to implement, though you may write additional functions and/or import other Python standard library modules. You may also import numpy or pandas or anything from scikit-learn, if familiar with them, but you should not use any other third-party Python modules. You should not modify shopping.csv."
+      ],
+      "metadata": {
+        "id": "m1WxxHXeD3sY"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ML MODEL로 KNeighborsClassifier가 적합한지 분류결과를 평가하여 보기로 함"
+      ],
+      "metadata": {
+        "id": "Vum51e68wTXZ"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# 실제 구매한 유저와 실제로 구매하지 않은 유저를 예측한 결과는 sensitivity / specificity 두개의 metrics에 합리적인지로 평가한다"
+      ],
+      "metadata": {
+        "id": "qVyOIkuWxaiU"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# 평가결과 : True / False"
+      ],
+      "metadata": {
+        "id": "DVJu9M05wiTZ"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# ***How to Submit***\n",
+        "You may not have your code in your ai50/projects/2020/x/shopping branch nested within any further subdirectories (such as a subdirectory called shopping or project4a). That is to say, if the staff attempts to access https://github.com/me50/USERNAME/blob/ai50/projects/2020/x/shopping/shopping.py, where USERNAME is your GitHub username, that is exactly where your file should live. If your file is not at that location when the staff attempts to grade, your submission will fail."
+      ],
+      "metadata": {
+        "id": "4_FsqkyfA7td"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "Visit this link, log in with your GitHub account, and click Authorize cs50. Then, check the box indicating that you’d like to grant course staff access to your submissions, and click Join course.\n",
+        "Install Git and, optionally, install submit50.\n",
+        "If you’ve installed submit50, execute\n",
+        "submit50 ai50/projects/2020/x/shopping\n",
+        "Otherwise, using Git, push your work to https://github.com/me50/USERNAME.git, where USERNAME is your GitHub username, on a branch called ai50/projects/2020/x/shopping.\n",
+        "\n",
+        "Submit this form.\n",
+        "You can then go to https://cs50.me/cs50ai to view your current progress!"
+      ],
+      "metadata": {
+        "id": "0NJR4BV6FRGb"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# ***How to Get Help***\n",
+        "\n",
+        "Ask questions via Ed!\n",
+        "\n",
+        "Ask questions via any of CS50’s communities!"
+      ],
+      "metadata": {
+        "id": "xZId9EYIAHgz"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# ***✈ SPECIAL THANKS TO SUNMI JUNG for RECOMMENDATION OF HARVARD LECTURE CS50 AI WITH PYTHON***\n",
+        "\n",
+        "\n",
+        "---\n"
+      ],
+      "metadata": {
+        "id": "gJ3a2pv-Azrt"
+      }
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# **Acknowledgements**\n",
+        "\n",
+        "Data set provided by Sakar, C.O., Polat, S.O., Katircioglu, M. et al. Neural Comput & Applic (2018)"
+      ],
+      "metadata": {
+        "id": "-8k4h-b0AzOT"
+      }
+    }
+  ]
+}
